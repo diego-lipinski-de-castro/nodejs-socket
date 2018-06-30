@@ -10,27 +10,59 @@ let clients = []
 
 const handler = (socket, data) => {
 
-    let r = true
-
-    if(data === 'exit') {
-        socket.end()
-        r = false
+    if(data.startsWith('::')) {
+        command(socket, data)
+    } else {
+        broadcast(logger(socket.name, data, new Date()), socket)
     }
 
-    return r
+}
+
+const command = (socket, action) => {
+
+    const odata = action
+
+    const h = odata.split('->')[0].trim().slice(2)
+
+    switch (h) {
+        case 'exit':
+            socket.end()
+            break;
+
+        case 'direct':
+
+            // this also doesnt log to the server
+
+            const msg = odata.split('->')[2].trim()
+
+            if(!msg) {
+                return false
+            }
+
+            const targetId = odata.split('->')[1].trim()
+
+            const target = clients.filter(client => {
+                return client.name === targetId
+            })
+
+            target[0].write(`DIRECT FROM: ${logger(socket.name, msg, new Date())}`)
+            socket.write(`SENT TO: ${logger(targetId, msg, new Date())}`)
+            break;
+        default:
+            socket.write(logger(socket.name, 'Comando não reconhecido', new Date()))
+            return false;
+            break;
+    }
 
 }
 
 const broadcast = (message, sender) => {
     clients.forEach(client => {
-        // if(client  === sender) return
-
         // send the message to the client
         client.write(message)
     })
 
-    // log the message to the server
-    console.log('LOG => ', message)
+    // log to the server
     process.stdout.write(message)
 }
 
@@ -41,10 +73,6 @@ const server = net.createServer(socket => {
     socket.name = `${socket.remoteAddress}:${socket.remotePort}`
 
     clients.push(socket)
-
-    socket.on('close', () => {
-        broadcast(logger(socket.name, 'Closed!', new Date()), socket)
-    })
 
     socket.on('end', () => {
         clients.splice(clients.indexOf(socket), 1)
@@ -63,8 +91,7 @@ const server = net.createServer(socket => {
     })
 
     socket.on('data', data => {
-        const r = handler(socket, data)
-        if(r) broadcast(logger(socket.name, data, new Date()), socket)
+        handler(socket, data)
     })
 })
 

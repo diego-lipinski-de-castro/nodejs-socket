@@ -28,7 +28,7 @@ rl.on('line', input => {
 
     if(!input.length) return
 
-    if(input === 'exit') rl.close()
+    if(input === '::exit') rl.close()
 
     client.write(input)
 })
